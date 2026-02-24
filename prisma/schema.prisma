@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  alerts    Alert[]
+}
+
+model Alert {
+  id            String          @id @default(cuid())
+  userId        String
+  cryptocurrency String
+  targetPrice   Float
+  condition     String          // "above" or "below"
+  isActive      Boolean         @default(true)
+  isTriggered   Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  triggeredAlerts TriggeredAlert[]
+}
+
+model TriggeredAlert {
+  id              String   @id @default(cuid())
+  alertId         String
+  triggeredPrice  Float
+  triggeredAt     DateTime @default(now())
+  alert           Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
+}
