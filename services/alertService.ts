@@ -1,34 +1,14 @@
-import prisma from '@/lib/prisma';
+import { getActiveAlerts, getAllAlerts, updateAlert, createTriggeredAlert, findAlertById } from '@/lib/db';
+import { findUserById } from '@/lib/db';
 import { getCryptoPrices, CryptoPrice } from './priceService';
 import { sendAlertEmail } from '@/lib/email';
-
-interface AlertWithUser {
-  id: string;
-  userId: string;
-  cryptocurrency: string;
-  targetPrice: number;
-  condition: string;
-  isActive: boolean;
-  isTriggered: boolean;
-  user: {
-    email: string | null;
-  };
-}
 
 export async function checkAlerts() {
   console.log('Checking alerts...');
   
   try {
     // Get all active, non-triggered alerts
-    const activeAlerts: AlertWithUser[] = await prisma.alert.findMany({
-      where: {
-        isActive: true,
-        isTriggered: false,
-      },
-      include: {
-        user: true,
-      },
-    }) as AlertWithUser[];
+    const activeAlerts = getActiveAlerts();
 
     if (activeAlerts.length === 0) {
       console.log('No active alerts to check');
@@ -60,26 +40,21 @@ export async function checkAlerts() {
         console.log(`Triggering alert for ${alert.cryptocurrency}: ${alert.condition} $${alert.targetPrice}`);
         
         // Update alert as triggered
-        await prisma.alert.update({
-          where: { id: alert.id },
-          data: {
-            isTriggered: true,
-            isActive: false,
-          },
+        updateAlert(alert.id, {
+          isTriggered: true,
+          isActive: false,
         });
 
         // Create triggered alert record
-        await prisma.triggeredAlert.create({
-          data: {
-            alertId: alert.id,
-            triggeredPrice: currentPrice,
-          },
-        });
+        createTriggeredAlert(alert.id, currentPrice);
+
+        // Get user for email
+        const user = findUserById(alert.userId);
 
         // Send email notification
-        if (alert.user.email) {
+        if (user?.email) {
           await sendAlertEmail({
-            to: alert.user.email,
+            to: user.email,
             cryptocurrency: alert.cryptocurrency.toUpperCase(),
             targetPrice: alert.targetPrice,
             currentPrice,

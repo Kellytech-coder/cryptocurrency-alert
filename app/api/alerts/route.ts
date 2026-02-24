@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { 
+  getAlertsByUserId, 
+  createAlert, 
+  deleteAlert, 
+  findAlertById,
+  getTriggeredAlertsByUserId 
+} from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 
 // Helper function to get user ID from token
@@ -24,21 +30,26 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const triggered = searchParams.get('triggered');
 
-    const alerts = await prisma.alert.findMany({
-      where: {
-        userId,
-        ...(triggered === 'true' ? { isTriggered: true } : { isTriggered: false }),
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        triggeredAlerts: {
-          orderBy: { triggeredAt: 'desc' },
-          take: 1,
-        },
-      },
-    });
+    let alerts = getAlertsByUserId(userId);
+    
+    if (triggered === 'true') {
+      alerts = alerts.filter(a => a.isTriggered);
+    } else {
+      alerts = alerts.filter(a => !a.isTriggered);
+    }
+    
+    alerts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    return NextResponse.json({ alerts });
+    const triggeredAlerts = getTriggeredAlertsByUserId(userId);
+    const alertsWithTriggered = alerts.map(alert => ({
+      ...alert,
+      triggeredAlerts: triggeredAlerts
+        .filter(ta => ta.alertId === alert.id)
+        .sort((a, b) => new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime())
+        .slice(0, 1)
+    }));
+
+    return NextResponse.json({ alerts: alertsWithTriggered });
   } catch (error) {
     console.error('Get alerts error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -69,14 +80,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const alert = await prisma.alert.create({
-      data: {
-        userId,
-        cryptocurrency,
-        targetPrice: parseFloat(targetPrice),
-        condition,
-      },
-    });
+    const alert = createAlert(userId, cryptocurrency, parseFloat(targetPrice), condition);
 
     return NextResponse.json({
       message: 'Alert created successfully',
@@ -104,20 +108,13 @@ export async function DELETE(request: Request) {
     }
 
     // Verify the alert belongs to the user
-    const alert = await prisma.alert.findFirst({
-      where: {
-        id: alertId,
-        userId,
-      },
-    });
+    const existingAlert = findAlertById(alertId);
 
-    if (!alert) {
+    if (!existingAlert || existingAlert.userId !== userId) {
       return NextResponse.json({ error: 'Alert not found' }, { status: 404 });
     }
 
-    await prisma.alert.delete({
-      where: { id: alertId },
-    });
+    deleteAlert(alertId);
 
     return NextResponse.json({ message: 'Alert deleted successfully' });
   } catch (error) {
