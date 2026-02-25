@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const user = findUserById(decoded.userId);
+    const user = await findUserById(decoded.userId);
 
     if (!user) {
       return NextResponse.json(

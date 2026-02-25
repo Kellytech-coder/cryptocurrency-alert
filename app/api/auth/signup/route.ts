@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     }
 
     // Check if user already exists
-    const existingUser = findUserByEmail(email);
+    const existingUser = await findUserByEmail(email);
 
     if (existingUser) {
       return NextResponse.json(
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
     // Hash password and create user
     const hashedPassword = await hashPassword(password);
-    const user = createUser(email, hashedPassword, name);
+    const user = await createUser(email, hashedPassword, name);
 
     // Generate token
     const token = generateToken(user.id);

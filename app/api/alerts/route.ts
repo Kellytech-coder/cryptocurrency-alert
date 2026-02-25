@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const triggered = searchParams.get('triggered');
 
-    let alerts = getAlertsByUserId(userId);
+    let alerts = await getAlertsByUserId(userId);
     
     if (triggered === 'true') {
       alerts = alerts.filter(a => a.isTriggered);
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     
     alerts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    const triggeredAlerts = getTriggeredAlertsByUserId(userId);
+    const triggeredAlerts = await getTriggeredAlertsByUserId(userId);
     const alertsWithTriggered = alerts.map(alert => ({
       ...alert,
       triggeredAlerts: triggeredAlerts
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const alert = createAlert(userId, cryptocurrency, parseFloat(targetPrice), condition);
+    const alert = await createAlert(userId, cryptocurrency, parseFloat(targetPrice), condition);
 
     return NextResponse.json({
       message: 'Alert created successfully',
@@ -108,13 +108,13 @@ export async function DELETE(request: Request) {
     }
 
     // Verify the alert belongs to the user
-    const existingAlert = findAlertById(alertId);
+    const existingAlert = await findAlertById(alertId);
 
     if (!existingAlert || existingAlert.userId !== userId) {
       return NextResponse.json({ error: 'Alert not found' }, { status: 404 });
     }
 
-    deleteAlert(alertId);
+    await deleteAlert(alertId);
 
     return NextResponse.json({ message: 'Alert deleted successfully' });
   } catch (error) {

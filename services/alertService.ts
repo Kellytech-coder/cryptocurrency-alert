@@ -8,7 +8,7 @@ export async function checkAlerts() {
   
   try {
     // Get all active, non-triggered alerts
-    const activeAlerts = getActiveAlerts();
+    const activeAlerts = await getActiveAlerts();
 
     if (activeAlerts.length === 0) {
       console.log('No active alerts to check');
@@ -40,16 +40,16 @@ export async function checkAlerts() {
         console.log(`Triggering alert for ${alert.cryptocurrency}: ${alert.condition} $${alert.targetPrice}`);
         
         // Update alert as triggered
-        updateAlert(alert.id, {
+        await updateAlert(alert.id, {
           isTriggered: true,
           isActive: false,
         });
 
         // Create triggered alert record
-        createTriggeredAlert(alert.id, currentPrice);
+        await createTriggeredAlert(alert.id, currentPrice);
 
         // Get user for email
-        const user = findUserById(alert.userId);
+        const user = await findUserById(alert.userId);
 
         // Send email notification
         if (user?.email) {

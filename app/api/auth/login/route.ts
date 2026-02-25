@@ -13,8 +13,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Find user
-    const user = findUserByEmail(email);
+    // Find user (now async)
+    const user = await findUserByEmail(email);
 
     if (!user) {
       return NextResponse.json(
@@ -51,4 +51,3 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
