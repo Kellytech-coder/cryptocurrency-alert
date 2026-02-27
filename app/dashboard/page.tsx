@@ -32,6 +32,7 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [triggeredAlerts, setTriggeredAlerts] = useState<Alert[]>([]);
   const [prices, setPrices] = useState<PriceData>({});
+  const [previousPrices, setPreviousPrices] = useState<PriceData>({});
   const [cryptos, setCryptos] = useState<{ id: string; name: string; symbol: string }[]>([]);
   const [selectedCrypto, setSelectedCrypto] = useState('bitcoin');
   const [chartCrypto, setChartCrypto] = useState('bitcoin');
@@ -39,6 +40,8 @@ export default function DashboardPage() {
   const [condition, setCondition] = useState('above');
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<string>('default');
 
   useEffect(() => {
     if (!isLoading && !token) {
@@ -48,12 +51,23 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (token) {
+      // Request notification permission
+      if ('Notification' in window) {
+        setNotificationPermission(Notification.permission);
+        if (Notification.permission === 'default') {
+          Notification.requestPermission().then(permission => {
+            setNotificationPermission(permission);
+          });
+        }
+      }
+      
       fetchAlerts();
       fetchPrices();
       fetchCryptos();
       const interval = setInterval(fetchPrices, 30000);
       return () => clearInterval(interval);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const fetchAlerts = async () => {
@@ -74,6 +88,8 @@ export default function DashboardPage() {
       const res = await fetch('/api/price');
       const data = await res.json();
       if (data.prices) {
+        // Store previous prices before updating
+        setPreviousPrices(prices);
         setPrices(data.prices);
       }
     } catch (error) {
@@ -94,6 +110,34 @@ export default function DashboardPage() {
       console.error('Error fetching cryptos:', error);
     }
   };
+
+  // Check for significant price changes and send notifications
+  useEffect(() => {
+    if (Object.keys(previousPrices).length === 0 || Object.keys(prices).length === 0) return;
+    
+    for (const [crypto, priceData] of Object.entries(prices)) {
+      const prevPrice = previousPrices[crypto];
+      if (!prevPrice) continue;
+      
+      const changePercent = ((priceData.usd - prevPrice.usd) / prevPrice.usd) * 100;
+      
+      // Notify on significant changes (more than 1%)
+      if (Math.abs(changePercent) >= 1) {
+        if (!('Notification' in window)) continue;
+        if (Notification.permission !== 'granted') continue;
+        
+        const direction = changePercent >= 0 ? '📈 Up' : '📉 Down';
+        const emoji = changePercent >= 0 ? '🟢' : '🔴';
+        
+        new Notification(`${emoji} ${crypto.toUpperCase()} Price Alert`, {
+          body: `${direction} by ${Math.abs(changePercent).toFixed(2)}%!\nCurrent: $${priceData.usd.toLocaleString()}`,
+          icon: '/favicon.ico',
+          tag: crypto,
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prices, previousPrices]);
 
   const createAlert = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,6 +185,10 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
+  const toggleDropdown = () => {
+    setShowDropdown(!showDropdown);
+  };
+
   // Generate initials from user's name or email
   const getUserInitials = () => {
     if (user?.name) {
@@ -177,34 +225,45 @@ export default function DashboardPage() {
             Crypto Alerts
           </h1>
           <div className="flex items-center gap-4">
-            {/* User Avatar with Logout Dropdown */}
-            <div className="relative group">
-              <div className="flex items-center gap-3 cursor-pointer">
+            {/* User Avatar with Logout Dropdown - Mobile Friendly */}
+            <div className="relative">
+              <button 
+                onClick={toggleDropdown}
+                className="flex items-center gap-3 cursor-pointer focus:outline-none"
+                aria-label="User menu"
+              >
                 <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm">
                   {getUserInitials()}
                 </div>
                 <span className="text-gray-300 font-medium hidden sm:inline">{getDisplayName()}</span>
-                {/* Dropdown arrow */}
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* Dropdown arrow - rotates when open */}
+                <svg 
+                  className={`w-4 h-4 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
-              </div>
+              </button>
               {/* Dropdown Menu */}
-              <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                <div className="p-3 border-b border-gray-700">
-                  <p className="text-sm text-gray-400">Signed in as</p>
-                  <p className="text-sm font-medium text-white truncate">{user?.email}</p>
+              {showDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                  <div className="p-3 border-b border-gray-700">
+                    <p className="text-sm text-gray-400">Signed in as</p>
+                    <p className="text-sm font-medium text-white truncate">{user?.email}</p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-600/20 transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Logout
+                  </button>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-600/20 transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  Logout
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </div>
