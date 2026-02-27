@@ -27,8 +27,8 @@ export async function POST(request: Request) {
     const hashedPassword = await hashPassword(password);
     const user = await createUser(email, hashedPassword, name);
 
-    // Generate token
-    const token = generateToken(user.id);
+    // Generate token with user info and password hash embedded
+    const token = generateToken(user.id, user.email, user.name, user.password);
 
     return NextResponse.json({
       message: 'User created successfully',

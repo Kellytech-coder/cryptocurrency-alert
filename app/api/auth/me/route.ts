@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { findUserById } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken, UserPayload } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
@@ -14,7 +13,7 @@ export async function GET(request: Request) {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = verifyToken(token);
+    const decoded = verifyToken(token) as UserPayload | null;
 
     if (!decoded) {
       return NextResponse.json(
@@ -23,21 +22,12 @@ export async function GET(request: Request) {
       );
     }
 
-    const user = await findUserById(decoded.userId);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
-
+    // Return user info directly from token (no database lookup needed)
     return NextResponse.json({ 
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        createdAt: user.createdAt,
+        id: decoded.userId,
+        email: decoded.email,
+        name: decoded.name,
       }
     });
   } catch (error) {

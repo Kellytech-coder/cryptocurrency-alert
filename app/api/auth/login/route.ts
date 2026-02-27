@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { findUserByEmail } from '@/lib/db';
-import { comparePassword, generateToken } from '@/lib/auth';
+import { comparePassword, generateToken, verifyToken, UserPayload } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Find user (now async)
+    // Find user
     const user = await findUserByEmail(email);
 
     if (!user) {
@@ -32,8 +32,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate token
-    const token = generateToken(user.id);
+    // Generate token with user info and password hash embedded
+    const token = generateToken(user.id, user.email, user.name, user.password);
 
     return NextResponse.json({
       message: 'Login successful',
@@ -51,3 +51,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}

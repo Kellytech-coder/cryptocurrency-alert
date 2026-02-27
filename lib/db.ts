@@ -1,4 +1,8 @@
-import { kv } from '@vercel/kv';
+// File-based storage for serverless environment
+// Uses JSON file to persist data between function invocations
+
+import fs from 'fs';
+import path from 'path';
 
 interface User {
   id: string;
@@ -28,68 +32,81 @@ interface TriggeredAlert {
   triggeredAt: string;
 }
 
-// Keys for KV storage
-const USERS_KEY = 'users';
-const ALERTS_KEY = 'alerts';
-const TRIGGERED_ALERTS_KEY = 'triggered_alerts';
+interface DataStore {
+  users: User[];
+  alerts: Alert[];
+  triggeredAlerts: TriggeredAlert[];
+}
+
+const DATA_FILE = path.join(process.cwd(), 'data.json');
+
+// In-memory storage with file-based persistence
+let usersStore: Map<string, User> = new Map();
+let alertsStore: Map<string, Alert> = new Map();
+let triggeredAlertsStore: Map<string, TriggeredAlert> = new Map();
+let isInitialized = false;
+
+// Load data from file
+function loadData(): void {
+  if (isInitialized) return;
+  
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const data: DataStore = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+      
+      // Load users
+      usersStore = new Map();
+      data.users?.forEach((user: User) => usersStore.set(user.id, user));
+      
+      // Load alerts
+      alertsStore = new Map();
+      data.alerts?.forEach((alert: Alert) => alertsStore.set(alert.id, alert));
+      
+      // Load triggered alerts
+      triggeredAlertsStore = new Map();
+      data.triggeredAlerts?.forEach((ta: TriggeredAlert) => triggeredAlertsStore.set(ta.id, ta));
+      
+      console.log('Data loaded from file');
+    } else {
+      // Ensure data directory exists
+      const dir = path.dirname(DATA_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      saveData();
+      console.log('New data file created');
+    }
+  } catch (error) {
+    console.error('Error loading data:', error);
+  }
+  
+  isInitialized = true;
+}
+
+// Save data to file
+function saveData(): void {
+  try {
+    const data: DataStore = {
+      users: Array.from(usersStore.values()),
+      alerts: Array.from(alertsStore.values()),
+      triggeredAlerts: Array.from(triggeredAlertsStore.values()),
+    };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error('Error saving data:', error);
+  }
+}
+
+// Initialize on module load
+loadData();
 
 // Generate unique ID
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
-// Helper to get all users from KV
-async function getUsers(): Promise<User[]> {
-  try {
-    const users = await kv.get<User[]>(USERS_KEY);
-    return users || [];
-  } catch (error) {
-    console.error('Error fetching users from KV:', error);
-    return [];
-  }
-}
-
-// Helper to save all users to KV
-async function saveUsers(users: User[]): Promise<void> {
-  await kv.set(USERS_KEY, users);
-}
-
-// Helper to get all alerts from KV
-async function getAlerts(): Promise<Alert[]> {
-  try {
-    const alerts = await kv.get<Alert[]>(ALERTS_KEY);
-    return alerts || [];
-  } catch (error) {
-    console.error('Error fetching alerts from KV:', error);
-    return [];
-  }
-}
-
-// Helper to save all alerts to KV
-async function saveAlerts(alerts: Alert[]): Promise<void> {
-  await kv.set(ALERTS_KEY, alerts);
-}
-
-// Helper to get all triggered alerts from KV
-async function getTriggeredAlerts(): Promise<TriggeredAlert[]> {
-  try {
-    const triggeredAlerts = await kv.get<TriggeredAlert[]>(TRIGGERED_ALERTS_KEY);
-    return triggeredAlerts || [];
-  } catch (error) {
-    console.error('Error fetching triggered alerts from KV:', error);
-    return [];
-  }
-}
-
-// Helper to save all triggered alerts to KV
-async function saveTriggeredAlerts(triggeredAlerts: TriggeredAlert[]): Promise<void> {
-  await kv.set(TRIGGERED_ALERTS_KEY, triggeredAlerts);
-}
-
 // User operations
 export async function createUser(email: string, password: string, name?: string): Promise<User> {
-  const users = await getUsers();
-  
   const user: User = {
     id: generateId(),
     email,
@@ -99,20 +116,22 @@ export async function createUser(email: string, password: string, name?: string)
     updatedAt: new Date().toISOString(),
   };
   
-  users.push(user);
-  await saveUsers(users);
-  
+  usersStore.set(user.id, user);
+  saveData();
   return user;
 }
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {
-  const users = await getUsers();
-  return users.find(u => u.email === email);
+  for (const user of usersStore.values()) {
+    if (user.email === email) {
+      return user;
+    }
+  }
+  return undefined;
 }
 
 export async function findUserById(id: string): Promise<User | undefined> {
-  const users = await getUsers();
-  return users.find(u => u.id === id);
+  return usersStore.get(id);
 }
 
 // Alert operations
@@ -122,8 +141,6 @@ export async function createAlert(
   targetPrice: number, 
   condition: 'above' | 'below'
 ): Promise<Alert> {
-  const alerts = await getAlerts();
-  
   const alert: Alert = {
     id: generateId(),
     userId,
@@ -136,59 +153,57 @@ export async function createAlert(
     updatedAt: new Date().toISOString(),
   };
   
-  alerts.push(alert);
-  await saveAlerts(alerts);
-  
+  alertsStore.set(alert.id, alert);
+  saveData();
   return alert;
 }
 
 export async function getAlertsByUserId(userId: string): Promise<Alert[]> {
-  const alerts = await getAlerts();
-  return alerts.filter(a => a.userId === userId);
+  const alerts: Alert[] = [];
+  for (const alert of alertsStore.values()) {
+    if (alert.userId === userId) {
+      alerts.push(alert);
+    }
+  }
+  return alerts;
 }
 
 export async function getActiveAlerts(): Promise<Alert[]> {
-  const alerts = await getAlerts();
-  return alerts.filter(a => a.isActive && !a.isTriggered);
+  const alerts: Alert[] = [];
+  for (const alert of alertsStore.values()) {
+    if (alert.isActive && !alert.isTriggered) {
+      alerts.push(alert);
+    }
+  }
+  return alerts;
 }
 
 export async function getAllAlerts(): Promise<Alert[]> {
-  return getAlerts();
+  return Array.from(alertsStore.values());
 }
 
 export async function updateAlert(id: string, updates: Partial<Alert>): Promise<Alert | undefined> {
-  const alerts = await getAlerts();
-  const index = alerts.findIndex(a => a.id === id);
+  const alert = alertsStore.get(id);
+  if (!alert) return undefined;
   
-  if (index === -1) return undefined;
-  
-  alerts[index] = { ...alerts[index], ...updates, updatedAt: new Date().toISOString() };
-  await saveAlerts(alerts);
-  
-  return alerts[index];
+  const updatedAlert = { ...alert, ...updates, updatedAt: new Date().toISOString() };
+  alertsStore.set(id, updatedAlert);
+  saveData();
+  return updatedAlert;
 }
 
 export async function deleteAlert(id: string): Promise<boolean> {
-  const alerts = await getAlerts();
-  const index = alerts.findIndex(a => a.id === id);
-  
-  if (index === -1) return false;
-  
-  alerts.splice(index, 1);
-  await saveAlerts(alerts);
-  
-  return true;
+  const result = alertsStore.delete(id);
+  if (result) saveData();
+  return result;
 }
 
 export async function findAlertById(id: string): Promise<Alert | undefined> {
-  const alerts = await getAlerts();
-  return alerts.find(a => a.id === id);
+  return alertsStore.get(id);
 }
 
 // Triggered Alert operations
 export async function createTriggeredAlert(alertId: string, triggeredPrice: number): Promise<TriggeredAlert> {
-  const triggeredAlerts = await getTriggeredAlerts();
-  
   const triggeredAlert: TriggeredAlert = {
     id: generateId(),
     alertId,
@@ -196,26 +211,38 @@ export async function createTriggeredAlert(alertId: string, triggeredPrice: numb
     triggeredAt: new Date().toISOString(),
   };
   
-  triggeredAlerts.push(triggeredAlert);
-  await saveTriggeredAlerts(triggeredAlerts);
-  
+  triggeredAlertsStore.set(triggeredAlert.id, triggeredAlert);
+  saveData();
   return triggeredAlert;
 }
 
 export async function getTriggeredAlertsByUserId(userId: string): Promise<TriggeredAlert[]> {
-  const alerts = await getAlerts();
-  const triggeredAlerts = await getTriggeredAlerts();
+  const userAlertIds = new Set<string>();
+  for (const alert of alertsStore.values()) {
+    if (alert.userId === userId) {
+      userAlertIds.add(alert.id);
+    }
+  }
   
-  const userAlertIds = alerts.filter(a => a.userId === userId).map(a => a.id);
-  return triggeredAlerts.filter(ta => userAlertIds.includes(ta.alertId));
+  const triggeredAlerts: TriggeredAlert[] = [];
+  for (const ta of triggeredAlertsStore.values()) {
+    if (userAlertIds.has(ta.alertId)) {
+      triggeredAlerts.push(ta);
+    }
+  }
+  return triggeredAlerts;
 }
 
 export async function getAllTriggeredAlerts(): Promise<TriggeredAlert[]> {
-  return getTriggeredAlerts();
+  return Array.from(triggeredAlertsStore.values());
 }
 
-// Sync versions for backward compatibility (for cases where async/await isn't used)
+// Sync versions for backward compatibility
 export function findUserByEmailSync(email: string): User | undefined {
-  // This is a fallback for synchronous calls - not recommended but kept for compatibility
+  for (const user of usersStore.values()) {
+    if (user.email === email) {
+      return user;
+    }
+  }
   return undefined;
 }
