@@ -38,7 +38,7 @@ interface DataStore {
   triggeredAlerts: TriggeredAlert[];
 }
 
-const DATA_FILE = path.join(process.cwd(), 'data.json');
+const DATA_FILE = path.join('/tmp', 'cryptocurrency-data.json');
 
 // In-memory storage with file-based persistence
 let usersStore: Map<string, User> = new Map();
