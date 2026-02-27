@@ -141,6 +141,26 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
+  // Generate initials from user's name or email
+  const getUserInitials = () => {
+    if (user?.name) {
+      const names = user.name.trim().split(' ');
+      if (names.length >= 2) {
+        return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+      }
+      return names[0].substring(0, 2).toUpperCase();
+    }
+    if (user?.email) {
+      return user.email.substring(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
+
+  // Get display name
+  const getDisplayName = () => {
+    return user?.name || user?.email || 'User';
+  };
+
   if (isLoading || !token) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -157,7 +177,13 @@ export default function DashboardPage() {
             Crypto Alerts
           </h1>
           <div className="flex items-center gap-4">
-            <span className="text-gray-300">{user?.email}</span>
+            {/* User Avatar with Initials */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm">
+                {getUserInitials()}
+              </div>
+              <span className="text-gray-300 font-medium">{getDisplayName()}</span>
+            </div>
             <button
               onClick={handleLogout}
               className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
