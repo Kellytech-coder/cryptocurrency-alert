@@ -134,7 +134,7 @@ export default function NotificationBell({ token }: NotificationBellProps) {
 
       {/* Dropdown */}
       {showDropdown && (
-        <div className="absolute right-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 max-h-96 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[60] max-h-96 overflow-hidden">
           {/* Header */}
           <div className="p-4 border-b border-gray-700 flex justify-between items-center">
             <h3 className="font-semibold text-white">Notifications</h3>

@@ -244,7 +244,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      <header className="bg-gray-800/50 backdrop-blur-lg border-b border-gray-700 z-40">
+      <header className="bg-gray-800/50 backdrop-blur-lg border-b border-gray-700 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
             Crypto Alerts
@@ -297,7 +297,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 z-10 relative">
+      <main className="max-w-7xl mx-auto px-4 py-8 relative">
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4 text-gray-300">Live Prices</h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
