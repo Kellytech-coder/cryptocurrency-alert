@@ -1,7 +1,5 @@
-// Vercel KV (Redis) storage for serverless environment
-// Provides persistent storage across function invocations
-
-import { kv } from '@vercel/kv';
+// In-memory storage with optional Vercel KV persistence
+// Provides storage for serverless environment
 
 interface User {
   id: string;
@@ -10,6 +8,19 @@ interface User {
   name: string | null;
   createdAt: string;
   updatedAt: string;
+  notificationPreferences?: NotificationPreferences;
+}
+
+interface NotificationPreferences {
+  emailEnabled: boolean;
+  browserEnabled: boolean;
+  pushEnabled: boolean;
+  priceChangeThreshold: number;
+  alertTypes: {
+    priceAbove: boolean;
+    priceBelow: boolean;
+    priceChange: boolean;
+  };
 }
 
 interface Alert {
@@ -31,10 +42,41 @@ interface TriggeredAlert {
   triggeredAt: string;
 }
 
-// Keys for KV storage
-const USERS_KEY = 'users';
-const ALERTS_KEY = 'alerts';
-const TRIGGERED_ALERTS_KEY = 'triggered_alerts';
+// In-memory storage
+const memoryStore: {
+  users: User[];
+  alerts: Alert[];
+  triggeredAlerts: TriggeredAlert[];
+} = {
+  users: [],
+  alerts: [],
+  triggeredAlerts: []
+};
+
+// Try to import Vercel KV, but make it optional
+// Only use KV if environment variables are properly set
+let kv: any = null;
+let useKv = false;
+
+const hasKvEnvVars = !!(
+  process.env.KV_REST_API_URL && 
+  process.env.KV_REST_API_TOKEN
+);
+
+if (hasKvEnvVars) {
+  try {
+    const kvModule = require('@vercel/kv');
+    kv = kvModule.kv;
+    useKv = true;
+    console.log('Vercel KV available, using KV storage');
+  } catch (e) {
+    console.log('Vercel KV not available, using in-memory storage');
+    useKv = false;
+  }
+} else {
+  console.log('Vercel KV environment variables not set, using in-memory storage');
+  useKv = false;
+}
 
 // Generate unique ID
 export function generateId(): string {
@@ -55,7 +97,12 @@ export async function createUser(email: string, password: string, name?: string)
   };
   
   users.push(user);
-  await kv.set(USERS_KEY, JSON.stringify(users));
+  
+  if (useKv && kv) {
+    await kv.set('users', JSON.stringify(users));
+  } else {
+    memoryStore.users = users;
+  }
   return user;
 }
 
@@ -70,13 +117,67 @@ export async function findUserById(id: string): Promise<User | undefined> {
 }
 
 async function getAllUsers(): Promise<User[]> {
-  try {
-    const data = await kv.get<string>(USERS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    return [];
+  if (useKv && kv) {
+    try {
+      const data = await kv.get('users');
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error fetching users from KV:', error);
+      return memoryStore.users;
+    }
   }
+  return memoryStore.users;
+}
+
+// Notification Preferences functions
+export async function getNotificationPreferences(userId: string): Promise<NotificationPreferences | null> {
+  const user = await findUserById(userId);
+  if (!user) return null;
+  
+  return user.notificationPreferences || {
+    emailEnabled: true,
+    browserEnabled: true,
+    pushEnabled: false,
+    priceChangeThreshold: 1,
+    alertTypes: {
+      priceAbove: true,
+      priceBelow: true,
+      priceChange: true,
+    },
+  };
+}
+
+export async function updateNotificationPreferences(
+  userId: string, 
+  preferences: Partial<NotificationPreferences>
+): Promise<NotificationPreferences | null> {
+  const users = await getAllUsers();
+  const index = users.findIndex(user => user.id === userId);
+  
+  if (index === -1) return null;
+  
+  const currentPrefs = users[index].notificationPreferences || {
+    emailEnabled: true,
+    browserEnabled: true,
+    pushEnabled: false,
+    priceChangeThreshold: 1,
+    alertTypes: {
+      priceAbove: true,
+      priceBelow: true,
+      priceChange: true,
+    },
+  };
+  
+  const updatedPrefs = { ...currentPrefs, ...preferences };
+  users[index] = { ...users[index], notificationPreferences: updatedPrefs };
+  
+  if (useKv && kv) {
+    await kv.set('users', JSON.stringify(users));
+  } else {
+    memoryStore.users = users;
+  }
+  
+  return updatedPrefs;
 }
 
 // Alert operations
@@ -101,7 +202,12 @@ export async function createAlert(
   };
   
   alerts.push(alert);
-  await kv.set(ALERTS_KEY, JSON.stringify(alerts));
+  
+  if (useKv && kv) {
+    await kv.set('alerts', JSON.stringify(alerts));
+  } else {
+    memoryStore.alerts = alerts;
+  }
   return alert;
 }
 
@@ -120,13 +226,16 @@ export async function getAllAlerts(): Promise<Alert[]> {
 }
 
 async function getAllAlertsRaw(): Promise<Alert[]> {
-  try {
-    const data = await kv.get<string>(ALERTS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error fetching alerts:', error);
-    return [];
+  if (useKv && kv) {
+    try {
+      const data = await kv.get('alerts');
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error fetching alerts from KV:', error);
+      return memoryStore.alerts;
+    }
   }
+  return memoryStore.alerts;
 }
 
 export async function updateAlert(id: string, updates: Partial<Alert>): Promise<Alert | undefined> {
@@ -137,7 +246,12 @@ export async function updateAlert(id: string, updates: Partial<Alert>): Promise<
   
   const updatedAlert = { ...alerts[index], ...updates, updatedAt: new Date().toISOString() };
   alerts[index] = updatedAlert;
-  await kv.set(ALERTS_KEY, JSON.stringify(alerts));
+  
+  if (useKv && kv) {
+    await kv.set('alerts', JSON.stringify(alerts));
+  } else {
+    memoryStore.alerts = alerts;
+  }
   return updatedAlert;
 }
 
@@ -148,7 +262,12 @@ export async function deleteAlert(id: string): Promise<boolean> {
   if (index === -1) return false;
   
   alerts.splice(index, 1);
-  await kv.set(ALERTS_KEY, JSON.stringify(alerts));
+  
+  if (useKv && kv) {
+    await kv.set('alerts', JSON.stringify(alerts));
+  } else {
+    memoryStore.alerts = alerts;
+  }
   return true;
 }
 
@@ -169,7 +288,12 @@ export async function createTriggeredAlert(alertId: string, triggeredPrice: numb
   };
   
   triggeredAlerts.push(triggeredAlert);
-  await kv.set(TRIGGERED_ALERTS_KEY, JSON.stringify(triggeredAlerts));
+  
+  if (useKv && kv) {
+    await kv.set('triggered_alerts', JSON.stringify(triggeredAlerts));
+  } else {
+    memoryStore.triggeredAlerts = triggeredAlerts;
+  }
   return triggeredAlert;
 }
 
@@ -186,17 +310,19 @@ export async function getAllTriggeredAlerts(): Promise<TriggeredAlert[]> {
 }
 
 async function getAllTriggeredAlertsRaw(): Promise<TriggeredAlert[]> {
-  try {
-    const data = await kv.get<string>(TRIGGERED_ALERTS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error fetching triggered alerts:', error);
-    return [];
+  if (useKv && kv) {
+    try {
+      const data = await kv.get('triggered_alerts');
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error fetching triggered alerts from KV:', error);
+      return memoryStore.triggeredAlerts;
+    }
   }
+  return memoryStore.triggeredAlerts;
 }
 
 // Sync versions for backward compatibility
 export function findUserByEmailSync(email: string): User | undefined {
-  // This is a fallback - in practice, use async version
-  return undefined;
+  return memoryStore.users.find(user => user.email === email);
 }

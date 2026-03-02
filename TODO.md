@@ -1,28 +1,43 @@
-# Crypto Trading Alert System - TODO List
+# Notification System Implementation
 
-## Phase 1: Setup & Configuration
-- [x] Install dependencies (prisma, bcryptjs, jsonwebtoken, nodemailer, node-cron, axios, react-chartjs-2, chart.js)
-- [x] Set up Prisma with SQLite schema
-- [x] Create database models (User, Alert, TriggeredAlert)
+## Completed Tasks:
+- [x] 1. Fix Vercel KV environment variable check in lib/db.ts
+- [x] 2. Add notification preferences to database (lib/db.ts)
+- [x] 3. Create notifications API route (app/api/notifications/route.ts)
+- [x] 4. Improve browser notifications in dashboard - Now uses user preferences
+- [x] 5. Add in-app notification bell with dropdown (components/NotificationBell.tsx)
+- [x] 6. Add notification settings/preferences UI in the NotificationBell dropdown
+- [ ] 7. Add web push notification support (requires additional setup)
 
-## Phase 2: Backend API
-- [x] Create lib/prisma.ts - Prisma client
-- [x] Create lib/auth.ts - JWT utilities
-- [x] Create lib/email.ts - Email notifications
-- [x] Create app/api/auth/signup/route.ts
-- [x] Create app/api/auth/login/route.ts
-- [x] Create app/api/auth/me/route.ts
-- [x] Create app/api/alerts/route.ts (CRUD)
-- [x] Create services/priceService.ts - Price polling
+## Features Implemented:
 
-## Phase 3: Frontend - Authentication
-- [x] Create app/(auth)/login/page.tsx
-- [x] Create app/(auth)/signup/page.tsx
-- [x] Create context/AuthContext.tsx
+### 1. Improved Browser Notifications
+- Now respects user's notification preferences
+- Configurable price change threshold (default 1%)
+- Only sends notifications when browser notifications are enabled
 
-## Phase 4: Frontend - Dashboard
-- [x] Create app/dashboard/page.tsx
-- [x] Create components/PriceChart.tsx
+### 2. In-App Notifications (NotificationBell)
+- Shows notification count badge
+- Displays list of triggered alerts
+- Settings for:
+  - Browser Notifications toggle
+  - Email Notifications toggle  
+  - Push Notifications toggle (placeholder)
+  - Price change threshold input
 
-## Phase 5: Testing & Verification
-- [x] Test complete flow - Build successful, Dev server running on http://localhost:3000
+### 3. Notification Preferences API
+- GET /api/notifications - Get preferences
+- PUT /api/notifications - Update preferences
+- Stored in user profile in database
+
+### 4. Notification Settings UI
+- Toggle switches for each notification type
+- Price change threshold slider/input
+- Visual feedback for read/unread notifications
+
+## Notes:
+- For full push notification support, you would need to:
+  1. Add web-push npm package
+  2. Create a service worker (public/sw.js)
+  3. Generate VAPID keys for web push
+  4. Add push subscription management

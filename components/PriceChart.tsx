@@ -308,7 +308,7 @@ export default function PriceChart({ crypto }: PriceChartProps): React.ReactNode
   const timeframes: TimeFrame[] = ['1H', '4H', '1D', '1W', '1M'];
 
   return (
-    <div className="bg-gray-800/50 rounded-xl p-4 space-y-4">
+    <div className="bg-gray-800/50 rounded-xl p-4 space-y-4 z-0 relative">
       {/* Header with price and timeframe */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         {/* Price Display */}

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import PriceChart from '@/components/PriceChart';
+import NotificationBell from '@/components/NotificationBell';
 
 interface Alert {
   id: string;
@@ -26,6 +27,13 @@ interface PriceData {
   };
 }
 
+interface NotificationPreferences {
+  emailEnabled: boolean;
+  browserEnabled: boolean;
+  pushEnabled: boolean;
+  priceChangeThreshold: number;
+}
+
 export default function DashboardPage() {
   const { user, token, logout, isLoading } = useAuth();
   const router = useRouter();
@@ -42,6 +50,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<string>('default');
+  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
 
   useEffect(() => {
     if (!isLoading && !token) {
@@ -64,11 +73,24 @@ export default function DashboardPage() {
       fetchAlerts();
       fetchPrices();
       fetchCryptos();
+      fetchNotificationPreferences();
       const interval = setInterval(fetchPrices, 30000);
       return () => clearInterval(interval);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  const fetchNotificationPreferences = async () => {
+    try {
+      const res = await fetch('/api/notifications', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setPreferences(data.preferences);
+    } catch (error) {
+      console.error('Error fetching notification preferences:', error);
+    }
+  };
 
   const fetchAlerts = async () => {
     try {
@@ -114,6 +136,9 @@ export default function DashboardPage() {
   // Check for significant price changes and send notifications
   useEffect(() => {
     if (Object.keys(previousPrices).length === 0 || Object.keys(prices).length === 0) return;
+    if (!preferences?.browserEnabled) return;
+    
+    const threshold = preferences?.priceChangeThreshold || 1;
     
     for (const [crypto, priceData] of Object.entries(prices)) {
       const prevPrice = previousPrices[crypto];
@@ -121,8 +146,8 @@ export default function DashboardPage() {
       
       const changePercent = ((priceData.usd - prevPrice.usd) / prevPrice.usd) * 100;
       
-      // Notify on significant changes (more than 1%)
-      if (Math.abs(changePercent) >= 1) {
+      // Notify on significant changes based on user preference threshold
+      if (Math.abs(changePercent) >= threshold) {
         if (!('Notification' in window)) continue;
         if (Notification.permission !== 'granted') continue;
         
@@ -137,7 +162,7 @@ export default function DashboardPage() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prices, previousPrices]);
+  }, [prices, previousPrices, preferences]);
 
   const createAlert = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,12 +244,15 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      <header className="bg-gray-800/50 backdrop-blur-lg border-b border-gray-700">
+      <header className="bg-gray-800/50 backdrop-blur-lg border-b border-gray-700 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
             Crypto Alerts
           </h1>
           <div className="flex items-center gap-4">
+            {/* Notification Bell */}
+            <NotificationBell token={token} />
+            
             {/* User Avatar with Logout Dropdown - Mobile Friendly */}
             <div className="relative">
               <button 
@@ -269,7 +297,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8 z-10 relative">
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4 text-gray-300">Live Prices</h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
