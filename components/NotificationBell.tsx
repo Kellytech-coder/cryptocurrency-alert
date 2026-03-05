@@ -13,9 +13,10 @@ interface Notification {
 
 interface NotificationBellProps {
   token: string | null;
+  onToggle?: (isOpen: boolean) => void;
 }
 
-export default function NotificationBell({ token }: NotificationBellProps) {
+export default function NotificationBell({ token, onToggle }: NotificationBellProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [preferences, setPreferences] = useState<any>(null);
@@ -115,10 +116,13 @@ export default function NotificationBell({ token }: NotificationBellProps) {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative dropdown-container overflow-visible" ref={dropdownRef}>
       {/* Notification Bell Button */}
       <button
-        onClick={() => setShowDropdown(!showDropdown)}
+        onClick={() => {
+          setShowDropdown(!showDropdown);
+          if (onToggle) onToggle(!showDropdown);
+        }}
         className="relative p-2 text-gray-400 hover:text-white transition-colors"
         aria-label="Notifications"
       >
@@ -134,7 +138,7 @@ export default function NotificationBell({ token }: NotificationBellProps) {
 
       {/* Dropdown */}
       {showDropdown && (
-        <div className="absolute right-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[60] max-h-96 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-80 bg-[#0a0a0a] border border-gray-700 rounded-lg shadow-2xl z-[60] max-h-96 overflow-hidden">
           {/* Header */}
           <div className="p-4 border-b border-gray-700 flex justify-between items-center">
             <h3 className="font-semibold text-white">Notifications</h3>

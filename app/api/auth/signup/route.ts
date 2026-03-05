@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createUser, findUserByEmail } from '@/lib/db';
+import { createUser, findUserByEmail, generateOTP, updateUserVerification } from '@/lib/db';
 import { hashPassword, generateToken } from '@/lib/auth';
 
 export async function POST(request: Request) {
@@ -27,17 +27,50 @@ export async function POST(request: Request) {
     const hashedPassword = await hashPassword(password);
     const user = await createUser(email, hashedPassword, name);
 
+    // Generate OTP for verification
+    const otp = generateOTP();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 10); // 10 minutes expiry
+
+    // Store OTP and set initial verification status
+    await updateUserVerification(user.id, {
+      verificationCode: otp,
+      verificationCodeExpiry: otpExpiry.toISOString(),
+      isEmailVerified: false,
+      isOTPVerified: false,
+    });
+
+    // Send OTP via email
+    const { sendOTPEmail, sendVerificationEmail } = await import('@/lib/email');
+    
+    // Send OTP email for initial verification
+    await sendOTPEmail({
+      to: user.email,
+      otp: otp,
+      name: user.name || 'User',
+    });
+
+    // Send verification email as well
+    await sendVerificationEmail({
+      to: user.email,
+      name: user.name || 'User',
+      verificationToken: otp,
+    });
+
     // Generate token with user info and password hash embedded
-    const token = generateToken(user.id, user.email, user.name, user.password);
+    const token = generateToken(user.id, user.email, user.name, hashedPassword);
 
     return NextResponse.json({
-      message: 'User created successfully',
+      message: 'User created successfully. Please verify your email and OTP.',
       token,
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
+        isEmailVerified: false,
+        isOTPVerified: false,
       },
+      requiresVerification: true,
     });
   } catch (error) {
     console.error('Signup error:', error);

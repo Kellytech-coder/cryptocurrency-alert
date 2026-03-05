@@ -33,7 +33,9 @@ export default function SignupPage() {
       }
 
       login(data.token, data.user);
-      router.push('/dashboard');
+      
+      // Redirect to OTP verification page
+      router.push('/verify-otp');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -101,6 +103,12 @@ export default function SignupPage() {
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
+
+        <div className="mt-6 p-4 bg-blue-600/20 border border-blue-600/30 rounded-lg">
+          <p className="text-blue-300 text-sm text-center">
+            After signup, you'll receive an OTP and verification email to verify your account.
+          </p>
+        </div>
 
         <p className="text-center text-gray-400 mt-6">
           Already have an account?{' '}

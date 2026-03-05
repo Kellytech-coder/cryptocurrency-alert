@@ -6,6 +6,8 @@ interface User {
   id: string;
   email: string;
   name: string | null;
+  isEmailVerified?: boolean;
+  isOTPVerified?: boolean;
 }
 
 interface AuthContextType {
@@ -14,6 +16,7 @@ interface AuthContextType {
   login: (token: string, user: User) => void;
   logout: () => void;
   isLoading: boolean;
+  isVerified: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,8 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  // Check if user is verified (both email and OTP)
+  const isVerified = user?.isEmailVerified === true && user?.isOTPVerified === true;
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isLoading, isVerified }}>
       {children}
     </AuthContext.Provider>
   );

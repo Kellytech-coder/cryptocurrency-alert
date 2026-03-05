@@ -24,3 +24,13 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Dropdown fix: Ensure navbar doesn't clip absolute dropdowns */
+.navbar-container {
+  overflow: visible !important;
+}
+
+/* Ensure dropdown containers don't get clipped */
+.dropdown-container {
+  overflow: visible !important;
+}

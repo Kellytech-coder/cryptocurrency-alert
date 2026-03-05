@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import PriceChart from '@/components/PriceChart';
@@ -49,14 +49,27 @@ export default function DashboardPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<string>('default');
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isLoading && !token) {
       router.push('/login');
     }
   }, [isLoading, token, router]);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (token) {
@@ -251,10 +264,10 @@ export default function DashboardPage() {
           </h1>
           <div className="flex items-center gap-4">
             {/* Notification Bell */}
-            <NotificationBell token={token} />
+            <NotificationBell token={token} onToggle={setShowNotifications} />
             
             {/* User Avatar with Logout Dropdown - Mobile Friendly */}
-            <div className="relative">
+            <div className="relative dropdown-container overflow-visible" ref={profileDropdownRef}>
               <button 
                 onClick={toggleDropdown}
                 className="flex items-center gap-3 cursor-pointer focus:outline-none"
@@ -276,7 +289,7 @@ export default function DashboardPage() {
               </button>
               {/* Dropdown Menu */}
               {showDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl z-50">
                   <div className="p-3 border-b border-gray-700">
                     <p className="text-sm text-gray-400">Signed in as</p>
                     <p className="text-sm font-medium text-white truncate">{user?.email}</p>
@@ -297,7 +310,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 relative">
+      <main className={`max-w-7xl mx-auto px-4 py-8 transition-opacity ${showDropdown || showNotifications ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4 text-gray-300">Live Prices</h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
