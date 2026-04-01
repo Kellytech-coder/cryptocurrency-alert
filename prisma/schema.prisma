@@ -30,8 +30,8 @@ model Alert {
   id              String   @id @default(cuid())
   userId          String
   cryptocurrency  String
-  targetPrice    Float
-  condition       String   // "above" or "below"
+  targetPrice     Float
+  condition       String   // \"above\" or \"below\"
   isActive        Boolean  @default(true)
   isTriggered     Boolean  @default(false)
   createdAt       DateTime @default(now())
@@ -42,10 +42,10 @@ model Alert {
 }
 
 model TriggeredAlert {
-  id            String   @id @default(cuid())
-  alertId       String
+  id             String   @id @default(cuid())
+  alertId        String
   triggeredPrice Float
-  triggeredAt   DateTime @default(now())
+  triggeredAt    DateTime @default(now())
   
-  alert         Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  alert          Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
 }
